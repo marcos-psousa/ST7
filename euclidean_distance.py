@@ -1,3 +1,9 @@
+import math
+import numpy as np
+from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, AncillaRegister, transpile
+from qiskit.circuit.library import StatePreparation, IntegerComparator
+from qiskit_aer import AerSimulator
+
 def euclidean_distance_circuit(a: np.ndarray, b: np.ndarray) -> QuantumCircuit:
     """
   Constrói o circuito para estimativa de d(a, b) conforme
