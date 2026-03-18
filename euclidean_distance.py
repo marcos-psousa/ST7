@@ -4,6 +4,11 @@ from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, AncillaRe
 from qiskit.circuit.library import StatePreparation, IntegerComparator
 from qiskit_aer import AerSimulator
 
+def _run(qc: QuantumCircuit, shots: int, backend) -> dict:
+    """Transpila para gates básicos do Aer e executa."""
+    tqc = transpile(qc, backend, optimization_level=0)
+    return backend.run(tqc, shots=shots).result().get_counts()
+
 def euclidean_distance_circuit(a: np.ndarray, b: np.ndarray) -> QuantumCircuit:
     """
   Constrói o circuito para estimativa de d(a, b) conforme
