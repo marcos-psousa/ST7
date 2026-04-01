@@ -70,19 +70,11 @@ def statevector_from_ansatz(ansatz, parameters):
 def solve_lowest_eigenpairs_vqd(
     L: np.ndarray,
     k: int,
-    reps: int = 2,
-    maxiter: int = 300,
-    seed: int = 42
+    reps: int = 4,
+    maxiter: int = 1000,
+    seed: int = 42,
+    betas=None,
 ):
-    """
-    Approximate the k lowest eigenpairs of a symmetric matrix using VQD.
-    :param L: Input symmetric matrix
-    :param k: Number of lowest eigenpairs to compute
-    :param reps: Number of repetitions in the ansatz circuit
-    :param maxiter: Maximum number of optimizer iterations
-    :param seed: Random seed
-    :return: Sorted eigenvalues, eigenvectors, padded matrix, and original dimension
-    """
     np.random.seed(seed)
 
     L_pad, original_dim = pad_symmetric_matrix_to_power_of_two(L)
@@ -101,11 +93,18 @@ def solve_lowest_eigenpairs_vqd(
     sampler = SamplerV2()
     fidelity = ComputeUncompute(sampler)
 
-    optimizer = COBYLA(maxiter=maxiter)
+    from qiskit_algorithms.optimizers import SLSQP
+    optimizer = SLSQP(maxiter=maxiter)
 
-    evals_exact = np.linalg.eigvalsh(L_pad)
-    spectral_scale = max(1.0, float(np.max(np.abs(evals_exact))))
-    betas = [2.0 * spectral_scale] * k
+    if betas is None:
+        evals_exact = np.linalg.eigvalsh(L_pad)
+        spectral_scale = max(1.0, float(np.max(np.abs(evals_exact))))
+        betas = [5.0 * spectral_scale] * k
+
+    history = []
+
+    def callback(eval_count, params, value, metadata, step):
+        history.append((step, eval_count, float(np.real(value))))
 
     vqd = VQD(
         estimator=estimator,
@@ -114,6 +113,7 @@ def solve_lowest_eigenpairs_vqd(
         optimizer=optimizer,
         k=k,
         betas=betas,
+        callback=callback,
     )
 
     result = vqd.compute_eigenvalues(hamiltonian)
@@ -123,8 +123,7 @@ def solve_lowest_eigenpairs_vqd(
 
     for params in result.optimal_points:
         sv = statevector_from_ansatz(ansatz, params)
-        vec = np.asarray(sv.data, dtype=complex)
-        eigenvectors.append(vec)
+        eigenvectors.append(np.asarray(sv.data, dtype=complex))
 
     eigenvectors = np.array(eigenvectors).T
 
@@ -132,7 +131,7 @@ def solve_lowest_eigenpairs_vqd(
     eigenvalues = eigenvalues[idx]
     eigenvectors = eigenvectors[:, idx]
 
-    return eigenvalues, eigenvectors, L_pad, original_dim
+    return eigenvalues, eigenvectors, L_pad, original_dim, history
 
 
 def spectral_embedding_from_eigenvectors(eigenvectors: np.ndarray, original_dim: int, k: int):
@@ -176,11 +175,11 @@ if __name__ == "__main__":
 
     k_eigs = 2
 
-    eigenvalues, eigenvectors, L_pad, original_dim = solve_lowest_eigenpairs_vqd(
+    eigenvalues, eigenvectors, L_pad, original_dim, history = solve_lowest_eigenpairs_vqd(
         L=L,
         k=k_eigs,
-        reps=2,
-        maxiter=300,
+        reps=10,
+        maxiter=5000,
         seed=42
     )
 

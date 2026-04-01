@@ -50,6 +50,38 @@ def print_matrix_comparison(name: str, Mq: np.ndarray, Mc: np.ndarray):
     print(np.max(np.abs(Mq - Mc)))
 
 
+def count_different_edges(Aq: np.ndarray, Ac: np.ndarray) -> int:
+    """
+    Count how many undirected edges differ between two adjacency matrices.
+    Assumes symmetric matrices.
+    """
+    Aq = np.asarray(Aq, dtype=int)
+    Ac = np.asarray(Ac, dtype=int)
+
+    if Aq.shape != Ac.shape:
+        raise ValueError("Adjacency matrices must have the same shape.")
+
+    if Aq.ndim != 2 or Aq.shape[0] != Aq.shape[1]:
+        raise ValueError("Adjacency matrices must be square.")
+
+    diff_upper = np.triu(Aq != Ac, k=1)
+    return int(np.sum(diff_upper))
+
+
+def print_adjacency_comparison(Aq: np.ndarray, Ac: np.ndarray):
+    """
+    Print adjacency matrices and the number of differing undirected edges.
+    """
+    print("A quantum:")
+    print(Aq)
+    print()
+    print("A classical:")
+    print(Ac)
+    print()
+    print("Number of different edges:")
+    print(count_different_edges(Aq, Ac))
+
+
 def solve_lowest_eigenpairs_classical(L: np.ndarray, k: int):
     """
     Compute the k lowest eigenpairs of a symmetric matrix classically.
@@ -146,11 +178,11 @@ def choose_threshold_from_distances(
     dataset_name = dataset_name.lower()
 
     if dataset_name == "blobs":
-        return float(np.percentile(values, 25.0))
+        return float(np.percentile(values, 15.0))
     if dataset_name == "moons":
-        return float(np.percentile(values, 30.0))
+        return float(np.percentile(values, 10.0))
     if dataset_name == "circles":
-        return float(np.percentile(values, 20.0))
+        return float(np.percentile(values, 10.0))
 
     return float(np.percentile(values, percentile))
 
@@ -233,15 +265,21 @@ def spectral_clustering_pipeline(
     D_quantum_scaled = D_quantum / scale
     D_classical_scaled = D_classical / scale
 
-    dmax2 = choose_threshold_from_distances(
+    dmax2_quantum = choose_threshold_from_distances(
         D_quantum_scaled,
+        dataset_name=dataset,
+        percentile=threshold_percentile,
+    )
+
+    dmax2_classical = choose_threshold_from_distances(
+        D_classical_scaled,
         dataset_name=dataset,
         percentile=threshold_percentile,
     )
 
     A_quantum = adjacency_matrix_quantum_value_by_value(
         A=D_quantum_scaled,
-        dmax2=dmax2,
+        dmax2=dmax2_quantum,
         frac_bits=frac_bits,
         diagonal_zero=True,
         verbose=False,
@@ -250,14 +288,15 @@ def spectral_clustering_pipeline(
 
     A_classical = adjacency_matrix_classical(
         A=D_classical_scaled,
-        dmax2=dmax2,
+        dmax2=dmax2_classical,
         diagonal_zero=True,
     )
 
     if verbose:
         print_section("ADJACENCY MATRICES")
         print(f"scale                : {scale:.6f}")
-        print(f"threshold dmax²      : {dmax2:.6f}")
+        print(f"threshold dmax²      : {dmax2_quantum:.6f}")
+        print(f"threshold dmax²      : {dmax2_classical:.6f}")
         print()
         print("D quantum scaled:")
         print(D_quantum_scaled)
@@ -265,23 +304,26 @@ def spectral_clustering_pipeline(
         print("D classical scaled:")
         print(D_classical_scaled)
         print()
-        print_matrix_comparison("A", A_quantum, A_classical)
+        print_adjacency_comparison(A_quantum, A_classical)
 
     # ---------------------------------------------------------
     # 4. Incidence-like matrix B_tilde
     # ---------------------------------------------------------
-    B_quantum = compute_B_quantum(
-        A=A_quantum,
-        eps_B=eps_B,
-        shots=shots_incidence,
-        use_AA=use_AA,
-        grover_iters=grover_iters,
-    )
-
     B_classical = compute_B_classical(
         A=A_classical,
         eps_B=eps_B,
     )
+
+    if n_points <= 16:
+        B_quantum = compute_B_quantum(
+            A=A_quantum,
+            eps_B=eps_B,
+            shots=shots_incidence,
+            use_AA=use_AA,
+            grover_iters=grover_iters,
+        )
+    else:
+        B_quantum = B_classical
 
     if verbose:
         print_section("INCIDENCE MATRICES")
@@ -290,14 +332,18 @@ def spectral_clustering_pipeline(
     # ---------------------------------------------------------
     # 5. Laplacian-like matrix L = B B^T
     # ---------------------------------------------------------
-    L_quantum = compute_L_quantum(
-        B=B_quantum,
-        shots=shots_distance,
-        backend=backend,
-        symmetric=True,
-    )
-
     L_classical = compute_L_classical(B_classical)
+
+    if n_points <= 16:
+        L_quantum = compute_L_quantum(
+            B=B_quantum,
+            shots=shots_distance,
+            backend=backend,
+            symmetric=True,
+        )
+
+    else:
+        L_quantum = L_classical
 
     if verbose:
         print_section("LAPLACIAN MATRICES")
@@ -306,7 +352,7 @@ def spectral_clustering_pipeline(
     # ---------------------------------------------------------
     # 6. Lowest eigenpairs via VQD
     # ---------------------------------------------------------
-    eigenvalues_q, eigenvectors_q, L_pad_q, original_dim_q = solve_lowest_eigenpairs_vqd(
+    eigenvalues_q, eigenvectors_q, L_pad_q, original_dim_q, _ = solve_lowest_eigenpairs_vqd(
         L=L_quantum,
         k=n_clusters,
         reps=reps_vqd,
@@ -392,7 +438,6 @@ def spectral_clustering_pipeline(
         "D_quantum_scaled": D_quantum_scaled,
         "D_classical_scaled": D_classical_scaled,
         "scale": scale,
-        "dmax2": dmax2,
         "A_quantum": A_quantum,
         "A_classical": A_classical,
         "B_quantum": B_quantum,
@@ -449,8 +494,8 @@ def main():
     parser.add_argument("--threshold_percentile", type=float, default=35.0)
 
     parser.add_argument("--use_AA", action="store_true")
-    parser.add_argument("--reps_vqd", type=int, default=2)
-    parser.add_argument("--maxiter_vqd", type=int, default=300)
+    parser.add_argument("--reps_vqd", type=int, default=10)
+    parser.add_argument("--maxiter_vqd", type=int, default=5000)
     parser.add_argument("--plot", action="store_true")
 
     args = parser.parse_args()
