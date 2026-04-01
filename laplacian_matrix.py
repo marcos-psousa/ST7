@@ -108,10 +108,71 @@ def estimate_inner_product_real_hadamard(
     counts = _run(qc_m, shots=shots, backend=backend)
     p0 = counts.get("0", 0) / shots
 
-    re_overlap = 2.0 * p0 - 1.0
-    re_overlap = float(np.clip(re_overlap, -1.0, 1.0))
+    inner_product = 2.0 * p0 - 1.0
+    inner_product = float(np.clip(inner_product, -1.0, 1.0))
 
-    return re_overlap
+    return inner_product
+
+
+def compute_L_quantum(
+    B: np.ndarray,
+    shots: int = 8192,
+    backend=None,
+    symmetric: bool = True,
+) -> np.ndarray:
+    """
+    Compute the full matrix L quantumly, where L[i, j] = Re(<B_i | B_j>).
+    If symmetric=True, compute only the upper triangle and mirror it.
+    :param B: Matrix whose rows are the vectors B_i
+    :param shots: Number of shots for each Hadamard-test estimation
+    :param backend: Qiskit backend used for simulation/execution
+    :param symmetric: Whether to force symmetry by computing only half the matrix
+    :return: Quantum-estimated matrix L
+    """
+    B = np.asarray(B, dtype=float)
+
+    if B.ndim != 2:
+        raise ValueError("B must be a 2D array.")
+
+    if backend is None:
+        backend = AerSimulator()
+
+    m = B.shape[0]
+    L_quantum = np.zeros((m, m), dtype=float)
+
+    if symmetric:
+        for i in range(m):
+            L_quantum[i, i] = estimate_inner_product_real_hadamard(
+                B[i], B[i], shots=shots, backend=backend
+            )
+            for j in range(i + 1, m):
+                val = estimate_inner_product_real_hadamard(
+                    B[i], B[j], shots=shots, backend=backend
+                )
+                L_quantum[i, j] = val
+                L_quantum[j, i] = val
+    else:
+        for i in range(m):
+            for j in range(m):
+                L_quantum[i, j] = estimate_inner_product_real_hadamard(
+                    B[i], B[j], shots=shots, backend=backend
+                )
+
+    return L_quantum
+
+
+def compute_L_classical(B: np.ndarray) -> np.ndarray:
+    """
+    Compute the full matrix L classically as B @ B^T.
+    :param B: Matrix whose rows are the vectors B_i
+    :return: Classical matrix L
+    """
+    B = np.asarray(B, dtype=float)
+
+    if B.ndim != 2:
+        raise ValueError("B must be a 2D array.")
+
+    return B @ B.T
 
 
 if __name__ == "__main__":
@@ -125,16 +186,13 @@ if __name__ == "__main__":
         [0.0, 0.0, 0.0, 0.0, -1 / math.sqrt(2), -1 / math.sqrt(2)],
     ], dtype=float)
 
-    m = B.shape[0]
-    L_quantum = np.zeros((m, m), dtype=float)
+    L_quantum = compute_L_quantum(
+        B=B,
+        shots=shots,
+        backend=backend
+    )
 
-    for i in range(m):
-        for j in range(m):
-            L_quantum[i, j] = estimate_inner_product_real_hadamard(
-                B[i], B[j], shots=shots, backend=backend
-            )
-
-    L_classical = B @ B.T
+    L_classical = compute_L_classical(B)
 
     print("Matrix B:")
     print(B)
@@ -147,3 +205,6 @@ if __name__ == "__main__":
 
     print("\nAbsolute error:")
     print(np.abs(L_quantum - L_classical))
+
+    print("\nMax absolute error:")
+    print(np.max(np.abs(L_quantum - L_classical)))

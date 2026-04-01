@@ -620,10 +620,18 @@ def extract_Bi_from_counts(counts, A, i, eps_B=0.2):
     return row
 
 
-def compute_row_B_shots(A, i, eps_B=0.2, shots=20000, use_AA=False, grover_iters=None,
-                        optimization_level=0, seed_simulator=1234):
+def compute_row_B_shots(
+    A,
+    i,
+    eps_B=0.2,
+    shots=20000,
+    use_AA=False,
+    grover_iters=None,
+    optimization_level=0,
+    seed_simulator=1234
+):
     """
-    Compute row i of B_tilde from shot-based simulation and compare it to the classical reference.
+    Compute row i of B_tilde from shot-based simulation.
     :param A: Adjacency matrix
     :param i: Vertex index whose row of B_tilde is being computed
     :param eps_B: Value used for non-incident entries
@@ -632,7 +640,7 @@ def compute_row_B_shots(A, i, eps_B=0.2, shots=20000, use_AA=False, grover_iters
     :param grover_iters: Number of Grover iterations; if None, use the estimated optimal value
     :param optimization_level: Transpiler optimization level
     :param seed_simulator: Random seed for the simulator
-    :return: Quantum row, classical row, maximum absolute error, counts, and circuit
+    :return: Quantum row B_q
     """
     backend = AerSimulator(method="statevector")
 
@@ -654,10 +662,68 @@ def compute_row_B_shots(A, i, eps_B=0.2, shots=20000, use_AA=False, grover_iters
 
     counts = result.get_counts()
     B_q = extract_Bi_from_counts(counts, A, i, eps_B=eps_B)
-    ref = classical_Bi(A, i, eps_B=eps_B)
-    err = float(np.max(np.abs(B_q - ref)))
 
-    return B_q, ref, err, counts, qc
+    return B_q
+
+
+def compute_B_quantum(
+    A,
+    eps_B=0.2,
+    shots=20000,
+    use_AA=False,
+    grover_iters=None,
+    optimization_level=0,
+    seed_simulator=1234
+):
+    """
+    Compute the full B_tilde matrix row by row using shot-based quantum simulation.
+    :param A: Adjacency matrix
+    :param eps_B: Value used for non-incident entries
+    :param shots: Number of shots used in each row simulation
+    :param use_AA: Whether to apply amplitude amplification
+    :param grover_iters: Number of Grover iterations; if None, use the estimated optimal value
+    :param optimization_level: Transpiler optimization level
+    :param seed_simulator: Random seed for the simulator
+    :return: Full quantum B_tilde matrix
+    """
+    A = np.array(A, dtype=int)
+    n = A.shape[0]
+    m = len(all_pairs(n))
+
+    B = np.zeros((n, m), dtype=float)
+
+    for i in range(n):
+        B[i] = compute_row_B_shots(
+            A=A,
+            i=i,
+            eps_B=eps_B,
+            shots=shots,
+            use_AA=use_AA,
+            grover_iters=grover_iters,
+            optimization_level=optimization_level,
+            seed_simulator=seed_simulator,
+        )
+
+    return B
+
+
+def compute_B_classical(A, eps_B=0.2):
+    """
+    Compute the full B_tilde matrix classically.
+    :param A: Adjacency matrix
+    :param eps_B: Value used for non-incident entries
+    :return: Full classical B_tilde matrix
+    """
+    A = np.array(A, dtype=int)
+    n = A.shape[0]
+    m = len(all_pairs(n))
+
+    B = np.zeros((n, m), dtype=float)
+
+    for i in range(n):
+        B[i] = classical_Bi(A, i, eps_B=eps_B)
+
+    return B
 
 
 if __name__ == "__main__":
@@ -670,19 +736,29 @@ if __name__ == "__main__":
         [0, 1, 0, 0, 0, 0]
     ], dtype=int)
 
-    n = len(A)
     eps_B = 0.2
     shots = 50000
 
-    print(f"{'i':>3}  {'erro':>10}  {'B_quantum(shots)':>25}")
-    print("-" * 90)
+    B_quantum = compute_B_quantum(
+        A,
+        eps_B=eps_B,
+        shots=shots,
+        use_AA=False
+    )
 
-    for i in range(n):
-        B_q, ref, err, counts, qc = compute_row_B_shots(
-            A, i, eps_B=eps_B, shots=shots, use_AA=False
-        )
-        print(f"{i:>3}  {err:>10.6f}  {np.round(B_q, 4)}")
+    B_classical = compute_B_classical(
+        A,
+        eps_B=eps_B
+    )
 
-    print("\nReferência clássica:")
-    for i in range(n):
-        print(f"{i}: {np.round(classical_Bi(A, i, eps_B), 4)}")
+    print("B quântico:")
+    print(np.round(B_quantum, 4))
+
+    print("\nB clássico:")
+    print(np.round(B_classical, 4))
+
+    print("\nErro absoluto:")
+    print(np.round(np.abs(B_quantum - B_classical), 4))
+
+    print("\nErro máximo:")
+    print(np.max(np.abs(B_quantum - B_classical)))

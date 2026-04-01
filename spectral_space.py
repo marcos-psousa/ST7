@@ -33,7 +33,7 @@ def pad_symmetric_matrix_to_power_of_two(L: np.ndarray):
         raise ValueError("L must be a square matrix.")
 
     if not np.allclose(L, L.T, atol=1e-10):
-        raise ValueError("L must be symmetric.")
+       raise ValueError("L must be symmetric.")
 
     m = L.shape[0]
     dim = next_power_of_two(m)
