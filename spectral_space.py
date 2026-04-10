@@ -9,7 +9,6 @@ from qiskit_aer.primitives import EstimatorV2, SamplerV2
 
 from qiskit_algorithms import VQD
 from qiskit_algorithms.state_fidelities import ComputeUncompute
-from qiskit_algorithms.optimizers import COBYLA
 
 
 def next_power_of_two(x: int) -> int:

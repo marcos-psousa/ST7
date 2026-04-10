@@ -180,10 +180,10 @@ if __name__ == "__main__":
     shots = 20000
 
     B = np.array([
-        [1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        [-1.0 / math.sqrt(3), 0.0, 0.0, 1 / math.sqrt(3), 1 / math.sqrt(3), 0.0],
-        [0.0, 0.0, 0.0, -1 / math.sqrt(2), 0.0, 1 / math.sqrt(2)],
-        [0.0, 0.0, 0.0, 0.0, -1 / math.sqrt(2), -1 / math.sqrt(2)],
+        [1.0,                 0.0, 0.0, 0.0,               0.0,              0.0],
+        [-1.0 / math.sqrt(3), 0.0, 0.0, 1 / math.sqrt(3),  1 / math.sqrt(3), 0.0],
+        [0.0,                 0.0, 0.0, -1 / math.sqrt(2), 0.0,              1 / math.sqrt(2)],
+        [0.0,                 0.0, 0.0, 0.0,               -1 / math.sqrt(2), -1 / math.sqrt(2)],
     ], dtype=float)
 
     L_quantum = compute_L_quantum(

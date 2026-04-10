@@ -38,8 +38,6 @@ from qiskit.quantum_info import Statevector
 from qiskit.circuit.library import StatePreparation
 
 
-# ── utilities ────────────────────────────────────────────────────────
-
 def bits_needed(n):
     """
     Compute the number of bits needed to represent indices from 0 to n - 1.
@@ -728,12 +726,10 @@ def compute_B_classical(A, eps_B=0.2):
 
 if __name__ == "__main__":
     A = np.array([
-        [0, 1, 0, 0, 1, 0],
-        [1, 0, 1, 1, 0, 1],
-        [0, 1, 0, 1, 1, 0],
-        [0, 1, 1, 0, 1, 0],
-        [1, 0, 1, 1, 0, 0],
-        [0, 1, 0, 0, 0, 0]
+        [0, 1, 0, 0],
+        [1, 0, 1, 1],
+        [0, 1, 0, 1],
+        [0, 1, 1, 0],
     ], dtype=int)
 
     eps_B = 0.2
@@ -751,14 +747,14 @@ if __name__ == "__main__":
         eps_B=eps_B
     )
 
-    print("B quântico:")
+    print("B Quantum:")
     print(np.round(B_quantum, 4))
 
-    print("\nB clássico:")
+    print("\nB Classical:")
     print(np.round(B_classical, 4))
 
-    print("\nErro absoluto:")
+    print("\nAbsolute error:")
     print(np.round(np.abs(B_quantum - B_classical), 4))
 
-    print("\nErro máximo:")
+    print("\nMax error:")
     print(np.max(np.abs(B_quantum - B_classical)))

@@ -43,7 +43,7 @@ def choose_threshold_from_distances(
     dataset_name = dataset_name.lower()
 
     if dataset_name == "blobs":
-        return float(np.percentile(values, 15.0))
+        return float(np.percentile(values, 20.0))
     if dataset_name == "moons":
         return float(np.percentile(values, 10.0))
     if dataset_name == "circles":
@@ -161,7 +161,7 @@ def compare_graphs(
         with_labels=True,
         node_color=node_colors,
         cmap=plt.cm.Set1,
-        node_size=500,
+        node_size=400,
         font_size=10,
     )
     axes[0].set_title(
@@ -176,7 +176,7 @@ def compare_graphs(
         with_labels=True,
         node_color=node_colors,
         cmap=plt.cm.Set1,
-        node_size=500,
+        node_size=400,
         font_size=10,
     )
     axes[1].set_title(
@@ -193,12 +193,12 @@ def main():
     # ============================================================
     # User parameters
     # ============================================================
-    dataset_name = "moons"   # 'blobs', 'moons', or 'circles'
+    dataset_name = "circles"   # 'blobs', 'moons', or 'circles'
     n_samples = 32           # keep small for quantum simulation cost
     noise = 0.06
     random_state = 42
     shots = 20000
-    frac_bits = 8
+    frac_bits = 4
 
     backend = AerSimulator()
 
